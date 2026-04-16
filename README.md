@@ -85,6 +85,16 @@ GitHub-PKB-ADO-Wiki-Sync/
 
 ---
 
+# Support documentation
+
+Additional operational support documents live in `docs/`.
+
+Current support docs:
+
+- `docs/ADO-Wiki-Setup-and-Sync-Workflow.md` — how to set up an ADO Wiki from an in-repo PKB and operate the publish/pullback workflow safely
+
+---
+
 # Configuration
 
 Copy `sync.config.example.json` to a solution-specific config file and update the paths.
