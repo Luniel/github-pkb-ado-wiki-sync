@@ -90,7 +90,7 @@ function Save-ConfigObject {
 
 function Invoke-Tool {
     param($Fixture, [ValidateSet('status', 'publish')][string]$Action = 'status')
-    $output = & $ScriptPath $Action -ConfigPath $Fixture.Config 2>&1 | Out-String
+    $output = & $ScriptPath $Action -ConfigPath $Fixture.Config *>&1 | Out-String
     return $output
 }
 
@@ -98,7 +98,7 @@ function Invoke-ToolExpectFailure {
     param($Fixture, [ValidateSet('status', 'publish')][string]$Action = 'status', [string]$Contains)
     $failed = $false
     try {
-        $output = & $ScriptPath $Action -ConfigPath $Fixture.Config 2>&1 | Out-String
+        $output = & $ScriptPath $Action -ConfigPath $Fixture.Config *>&1 | Out-String
     }
     catch {
         $failed = $true
@@ -364,6 +364,19 @@ Test-Case 'manuscript old is not copied merely because it exists' {
     $fx = New-Fixture
     Invoke-Tool $fx publish | Out-Null
     Assert-False (Test-Path -LiteralPath (Join-Path $fx.Pub 'old/archive.md')) 'old copied'
+}
+
+
+Test-Case 'captures Write-Host status text and publish operation lines' {
+    $fx = New-Fixture
+    $statusOutput = Invoke-Tool $fx status
+    Assert-True ($statusOutput -match 'Source manuscript path:') "Status output was not captured: [$statusOutput]"
+    Assert-True ($statusOutput -match 'Publication projection has pending changes') "Status summary was not captured: [$statusOutput]"
+
+    $publishOutput = Invoke-Tool $fx publish
+    $operationLines = @($publishOutput -split "`r?`n" | Where-Object { $_ -match '^(ADD|UPDATE|DELETE)\s+' })
+    Assert-True ($operationLines.Count -gt 0) "Publish operation lines were not captured: [$publishOutput]"
+    Assert-True (@($operationLines | Where-Object { $_ -eq 'ADD book.txt' }).Count -eq 1) "Expected ADD book.txt in captured operation lines: [$($operationLines -join ', ')]"
 }
 
 Test-Case 'initial publication adds expected files' {
