@@ -77,10 +77,19 @@ def snapshot(root):
     return {'files':dict(sorted(files.items())), 'empty_dirs':sorted(dirs)}
 
 def same(a,b): return a==b
+def path_kind(snapshot_value, path):
+    if path in snapshot_value['files']: return 'file'
+    if path in snapshot_value.get('empty_dirs',[]): return 'dir'
+    return None
 def counts(a,b):
     ak=set(a['files'])|set(a.get('empty_dirs',[])); bk=set(b['files'])|set(b.get('empty_dirs',[]))
-    mod=sum(1 for k in set(a['files'])&set(b['files']) if a['files'][k]!=b['files'][k])
-    return len(ak-bk), mod, len(bk-ak), len(ak&bk)-mod
+    added=len(ak-bk); deleted=len(bk-ak); modified=0; unchanged=0
+    for p in ak & bk:
+        akind=path_kind(a,p); bkind=path_kind(b,p)
+        if akind!=bkind: modified+=1
+        elif akind=='file' and a['files'][p]!=b['files'][p]: modified+=1
+        else: unchanged+=1
+    return added, modified, deleted, unchanged
 
 def load_json_file(path, label):
     inspect_existing_components(path, label)
@@ -129,7 +138,10 @@ def validate_env(c):
     if os.path.exists(tm) or os.path.lexists(tm):
         tst=inspect_existing_path(tm,'target manuscript')
         if not stat.S_ISDIR(tst.st_mode): raise SyncError(f'Target manuscript path is not a directory: {tm}')
-    sf=c['state_file']; inspect_existing_components(os.path.dirname(sf),'state-file parent')
+    sf=c['state_file']; state_parent=os.path.dirname(sf); inspect_existing_components(state_parent,'state-file parent')
+    if os.path.exists(state_parent) or os.path.lexists(state_parent):
+        pst=inspect_existing_path(state_parent,'state-file parent')
+        if not stat.S_ISDIR(pst.st_mode): raise SyncError(f'State-file parent is not a directory: {state_parent}')
     if os.path.exists(sf) or os.path.lexists(sf): inspect_existing_path(sf,'state file')
     if inside(sf,src_lex) or inside(sf,tgt_lex): raise SyncError('State file must not be inside either repository')
     marker=os.path.join(tgt_lex,MARKER)
@@ -145,6 +157,22 @@ def validate_env(c):
     if text!=c['expected_target_id']: raise SyncError(f'Target marker mismatch: expected {c["expected_target_id"]}, found {text}')
     return sm,tm
 
+def normalized_path_key(path):
+    return os.path.normcase(path)
+def has_ancestor(path, possible_ancestor):
+    return path.startswith(possible_ancestor.rstrip('/') + '/')
+def validate_no_structural_collisions(files, dirs):
+    entries=[]; seen={}
+    for p in files: entries.append((p,'file'))
+    for p in dirs: entries.append((p,'dir'))
+    for p,kind in entries:
+        key=normalized_path_key(p)
+        if key in seen: raise SyncError('Duplicate or conflicting normalized path in state snapshot')
+        seen[key]=kind
+    keys=sorted(seen)
+    for i,a in enumerate(keys):
+        for b in keys[i+1:]:
+            if has_ancestor(b,a): raise SyncError('State snapshot contains an impossible ancestor path relationship')
 def validate_snapshot_schema(snap):
     if not isinstance(snap,dict) or set(snap.keys())!={'files','empty_dirs'}: raise SyncError('Malformed state snapshot')
     files=snap.get('files'); dirs=snap.get('empty_dirs')
@@ -153,15 +181,16 @@ def validate_snapshot_schema(snap):
     seen_dirs=set()
     for d in dirs:
         validate_rel(d)
-        if d in seen_dirs: raise SyncError('Duplicate empty directory path in state')
-        seen_dirs.add(d)
+        if normalized_path_key(d) in seen_dirs: raise SyncError('Duplicate empty directory path in state')
+        seen_dirs.add(normalized_path_key(d))
     for p,meta in files.items():
         validate_rel(p)
-        if p in seen_dirs: raise SyncError('State path cannot be both file and empty directory')
+        if normalized_path_key(p) in seen_dirs: raise SyncError('State path cannot be both file and empty directory')
         if not isinstance(meta,dict) or set(meta.keys())!={'sha256','bytes'}: raise SyncError('Malformed state file metadata')
         if not isinstance(meta.get('sha256'),str) or not SHA_RE.match(meta['sha256']): raise SyncError('Malformed state sha256')
         b=meta.get('bytes')
         if not isinstance(b,int) or isinstance(b,bool) or b<0: raise SyncError('Malformed state byte count')
+    validate_no_structural_collisions(files.keys(), dirs)
     return {'files':dict(sorted(files.items())), 'empty_dirs':sorted(dirs)}
 
 def parse_timestamp(value):
@@ -204,6 +233,25 @@ def copy_tree(src,dst):
 def remove_tree(path):
     if os.path.exists(path) or os.path.lexists(path): shutil.rmtree(path)
 
+def ensure_real_directory(path, label):
+    if os.path.exists(path) or os.path.lexists(path):
+        st=inspect_existing_path(path,label)
+        if not stat.S_ISDIR(st.st_mode): raise SyncError(f'{label} is not a directory: {path}')
+    else:
+        inspect_existing_components(os.path.dirname(path), label + ' parent')
+        os.makedirs(path, exist_ok=True)
+        st=inspect_existing_path(path,label)
+        if not stat.S_ISDIR(st.st_mode): raise SyncError(f'{label} is not a directory: {path}')
+def prepare_transaction_parent(c):
+    state_parent=os.path.dirname(c['state_file'])
+    ensure_real_directory(state_parent,'state-file parent')
+    work_parent=lex_abs(os.path.join(state_parent,'.protected-manuscript-sync-work'))
+    created=not (os.path.exists(work_parent) or os.path.lexists(work_parent))
+    ensure_real_directory(work_parent,'transaction work parent')
+    if inside(work_parent,c['source_repo_lexical']) or inside(work_parent,c['publishing_repo_lexical']):
+        raise SyncError('Transaction work parent must be outside source and publishing repositories')
+    return work_parent, created
+
 def write_state(c,S):
     data={'schema_version':STATE_SCHEMA,'source_repo_path':c['source_repo_path'],'publishing_repo_path':c['publishing_repo_path'],'expected_target_id':c['expected_target_id'],'accepted_utc':dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z'),'accepted_snapshot':S}
     os.makedirs(os.path.dirname(c['state_file']),exist_ok=True)
@@ -221,7 +269,11 @@ def restore_target(tm, existed, rollback, before):
     if not ok: raise MutationFailure('rollback verification failed')
 
 def publish(c,sm,tm,S,T,cl):
-    target_existed=os.path.isdir(tm); before=snapshot(tm); tmpbase=tempfile.mkdtemp(prefix='protected-manuscript-sync-')
+    target_existed=os.path.isdir(tm); before=snapshot(tm); work_parent,parent_created=prepare_transaction_parent(c)
+    tmpbase=tempfile.mkdtemp(prefix='protected-manuscript-sync-', dir=work_parent)
+    if inside(tmpbase,c['source_repo_lexical']) or inside(tmpbase,c['publishing_repo_lexical']):
+        shutil.rmtree(tmpbase,ignore_errors=True)
+        raise SyncError('Transaction directory must be outside source and publishing repositories')
     stage=os.path.join(tmpbase,'stage'); rollback=os.path.join(tmpbase,'rollback'); mutation_started=False
     try:
         copy_tree(sm,stage)
@@ -243,7 +295,11 @@ def publish(c,sm,tm,S,T,cl):
         try: restore_target(tm,target_existed,rollback,before)
         except Exception as rb: raise MutationFailure(f'Publish failed: {e}; rollback failed: {rb}')
         raise MutationFailure(f'Publish failed: {e}; rollback verified')
-    finally: shutil.rmtree(tmpbase,ignore_errors=True)
+    finally:
+        shutil.rmtree(tmpbase,ignore_errors=True)
+        if parent_created:
+            try: os.rmdir(work_parent)
+            except OSError: pass
 
 def report(action,c,sm,tm,S,T,state,cl,msg,reason=None,mut=None):
     a,m,d,u=counts(S,T)

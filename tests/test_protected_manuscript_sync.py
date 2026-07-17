@@ -63,7 +63,7 @@ class T(unittest.TestCase):
         r=self.status(); self.assertEqual(r.returncode,0); self.assertIn('initial-empty-target',r.stdout); self.assertFalse(self.statep.exists())
         r=self.publish(); self.assertEqual(r.returncode,0,r.stderr); self.assertTrue((self.pub/'manuscript'/'book.txt').exists())
         self.t.cleanup(); self.setUp(); shutil.copytree(self.src/'manuscript',self.pub/'manuscript'); before=(self.pub/'manuscript'/'book.txt').stat().st_mtime_ns
-        self.assertIn('initial-identical-target',self.status().stdout); self.assertEqual(self.publish().returncode,0); self.assertEqual(before,(self.pub/'manuscript'/'book.txt').stat().st_mtime_ns)
+        self.assertIn('initial-identical-target',self.status().stdout); code,text=self.run_direct(); self.assertEqual(code,0,text); self.assertEqual(before,(self.pub/'manuscript'/'book.txt').stat().st_mtime_ns)
         self.t.cleanup(); self.setUp(); (self.pub/'manuscript').mkdir(); (self.pub/'manuscript'/'other.md').write_text('x'); self.assert_blocked_report(self.status(),'blocked-initial-differing-target'); self.assert_blocked_report(self.publish(),'blocked-initial-differing-target')
     def test_source_add_modify_delete_binary_spaces_empty_dirs_confined(self):
         (self.src/'manuscript'/'dir with spaces'/'empty').mkdir(parents=True); (self.src/'manuscript'/'dir with spaces'/'b.bin').write_bytes(b'\0\xffbin'); (self.pub/'outside.txt').write_text('keep'); marker=(self.pub/'.protected-manuscript-publishing-target').read_text(); self.init()
@@ -155,6 +155,58 @@ class T(unittest.TestCase):
         with mock.patch('shutil.copytree',side_effect=fail_target):
             code,text=self.run_direct(); self.assertEqual(code,4)
         self.assertFalse((self.pub/'manuscript').exists()); self.assertFalse(self.statep.exists())
+
+    def test_counts_file_directory_type_change_is_modified(self):
+        a={'files':{'same':{'sha256':'0'*64,'bytes':1}},'empty_dirs':[]}
+        b={'files':{},'empty_dirs':['same']}
+        self.assertEqual(pms.counts(a,b),(0,1,0,0))
+        (self.pub/'manuscript').mkdir(); (self.pub/'manuscript'/'book.txt').write_text('book'); (self.pub/'manuscript'/'same').mkdir()
+        (self.src/'manuscript'/'same').write_text('file')
+        r=self.status(); self.assertEqual(r.returncode,3); self.assertIn('modified=1',r.stderr)
+    def test_state_ancestor_paths_rejected(self):
+        self.init(); base=self.state(); bad=[({'a':{'sha256':'0'*64,'bytes':1},'a/b.md':{'sha256':'0'*64,'bytes':1}},[]), ({'a':{'sha256':'0'*64,'bytes':1}},['a/empty']), ({},['a','a/b'])]
+        for files,dirs in bad:
+            x=dict(base); x['accepted_snapshot']={'files':files,'empty_dirs':dirs}; self.statep.write_text(json.dumps(x),encoding='utf-8'); self.assertEqual(self.status().returncode,2)
+    def test_transaction_parent_external_ignores_default_temp_and_cleans_success(self):
+        self.init(); (self.src/'manuscript'/'new.md').write_text('new')
+        state_parent=self.statep.parent; work_parent=state_parent/'.protected-manuscript-sync-work'; seen=[]; orig=pms.tempfile.mkdtemp
+        def record_mkdtemp(*args,**kwargs):
+            seen.append(kwargs.get('dir')); return orig(*args,**kwargs)
+        old_tempdir=tempfile.tempdir; old_tmp=os.environ.get('TMP'); old_temp=os.environ.get('TEMP')
+        try:
+            tempfile.tempdir=str(self.src); os.environ['TMP']=str(self.pub); os.environ['TEMP']=str(self.src/'manuscript')
+            with mock.patch('protected_manuscript_sync.tempfile.mkdtemp',side_effect=record_mkdtemp):
+                code,text=self.run_direct(); self.assertEqual(code,0,text)
+        finally:
+            tempfile.tempdir=old_tempdir
+            if old_tmp is None: os.environ.pop('TMP',None)
+            else: os.environ['TMP']=old_tmp
+            if old_temp is None: os.environ.pop('TEMP',None)
+            else: os.environ['TEMP']=old_temp
+        self.assertTrue(seen); self.assertEqual(Path(seen[0]),work_parent); self.assertFalse(work_parent.exists()); self.assertFalse(any(p.name.startswith('protected-manuscript-sync-') for p in self.src.rglob('*')))
+    def test_transaction_parent_external_ignores_publishing_and_target_temp_failure_cleans(self):
+        self.init(); (self.src/'manuscript'/'new.md').write_text('new'); state_parent=self.statep.parent; work_parent=state_parent/'.protected-manuscript-sync-work'
+        old_tempdir=tempfile.tempdir; old_tmp=os.environ.get('TMP'); old_temp=os.environ.get('TEMP')
+        try:
+            tempfile.tempdir=str(self.pub); os.environ['TMP']=str(self.pub/'manuscript'); os.environ['TEMP']=str(self.pub)
+            with mock.patch('protected_manuscript_sync.write_state',side_effect=OSError('state write fail')):
+                code,text=self.run_direct(); self.assertEqual(code,4); self.assertIn('state write fail',text)
+        finally:
+            tempfile.tempdir=old_tempdir
+            if old_tmp is None: os.environ.pop('TMP',None)
+            else: os.environ['TMP']=old_tmp
+            if old_temp is None: os.environ.pop('TEMP',None)
+            else: os.environ['TEMP']=old_temp
+        self.assertFalse(work_parent.exists()); self.assertFalse(any(p.name.startswith('protected-manuscript-sync-') for p in self.pub.rglob('*')))
+    def test_state_parent_file_and_transaction_parent_reparse_rejected(self):
+        file_parent=self.d/'not-dir'; file_parent.write_text('x'); self.write_cfg(state_file=str(file_parent/'s.json')); self.assertEqual(self.status().returncode,2)
+        if hasattr(os,'symlink'):
+            real=self.d/'real-work'; real.mkdir(); link=self.d/'.protected-manuscript-sync-work'
+            try: os.symlink(real,link,target_is_directory=True)
+            except OSError as e: self.skipTest(f'symlink unavailable: {e}')
+            self.write_cfg(state_file=str(self.d/'state.json'))
+            r=self.publish(); self.assertEqual(r.returncode,2); self.assertIn('transaction work parent',r.stderr)
+
     def test_exit_codes_no_force_no_pullback(self):
         self.assertEqual(self.status().returncode,0); self.assertEqual(self.cli('--help').returncode,0); self.assertNotEqual(self.cli('pullback','--config',str(self.cfg)).returncode,0); self.assertNotEqual(self.cli('status','--config',str(self.cfg),'--force').returncode,0)
     def make_junction(self, link, target):
