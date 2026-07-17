@@ -10,3 +10,7 @@ Thumbs.db
 # Local-only folders
 history/
 local-only/
+
+# Python cache and test artifacts
+__pycache__/
+*.py[cod]

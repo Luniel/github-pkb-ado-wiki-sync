@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "source_repo_path": "D:\\GitHub\\book-the-gap",
+  "publishing_repo_path": "D:\\GitHub\\book-the-gap-publishing",
+  "expected_target_id": "the-gap-publishing",
+  "state_file": ".\\the-gap-manuscript-sync.state.json"
+}
