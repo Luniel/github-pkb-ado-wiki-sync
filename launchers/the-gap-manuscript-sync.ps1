@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 function Fail-Wrapper {
     param([string]$Message)
-    [Console]::Error.WriteLine($Message)
+    Write-Error -Message $Message -ErrorAction Continue
     exit 2
 }
 
@@ -53,5 +53,14 @@ if ($null -eq $selected) {
 $args = @()
 $args += $selected.Prefix
 $args += @($enginePath, $Action, "--config", $configFullPath)
-& $selected.Command @args
-exit $LASTEXITCODE
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    & $selected.Command @args
+    $engineExitCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+
+exit $engineExitCode
