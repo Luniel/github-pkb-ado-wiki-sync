@@ -374,7 +374,13 @@ Test-Case 'captures Write-Host status text and publish operation lines' {
     Assert-True ($statusOutput -match 'Publication projection has pending changes') "Status summary was not captured: [$statusOutput]"
 
     $publishOutput = Invoke-Tool $fx publish
-    $operationLines = @($publishOutput -split "`r?`n" | Where-Object { $_ -match '^(ADD|UPDATE|DELETE)\s+' })
+    $operationLines = @(
+        $publishOutput -split "`r?`n" |
+            Where-Object {
+                $_ -match '^(ADD|UPDATE|DELETE)\s+' -and
+                $_ -notmatch '^(ADD|UPDATE|DELETE)\s+(count:|paths:)'
+            }
+    )
     Assert-True ($operationLines.Count -gt 0) "Publish operation lines were not captured: [$publishOutput]"
     Assert-True (@($operationLines | Where-Object { $_ -eq 'ADD book.txt' }).Count -eq 1) "Expected ADD book.txt in captured operation lines: [$($operationLines -join ', ')]"
 }
@@ -439,7 +445,13 @@ Test-Case 'second publish is idempotent without operation lines' {
     $fx = New-Fixture
     Invoke-Tool $fx publish | Out-Null
     $output = Invoke-Tool $fx publish
-    $operationLines = @($output -split "`r?`n" | Where-Object { $_ -match '^(ADD|UPDATE|DELETE)\s+' })
+    $operationLines = @(
+        $output -split "`r?`n" |
+            Where-Object {
+                $_ -match '^(ADD|UPDATE|DELETE)\s+' -and
+                $_ -notmatch '^(ADD|UPDATE|DELETE)\s+(count:|paths:)'
+            }
+    )
     Assert-True ($output -match 'Publication projection is synchronized') $output
     Assert-True ($operationLines.Count -eq 0) "Unexpected operation lines: $($operationLines -join ', ')"
 }
