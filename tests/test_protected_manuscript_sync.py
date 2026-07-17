@@ -226,8 +226,8 @@ class T(unittest.TestCase):
     def test_windows_junction_rejections(self):
         if os.name!='nt': self.skipTest('Windows reparse points require Windows')
         j=self.src/'manuscript'/'j'; real=self.d/'realj'; real.mkdir(); self.make_junction(j,real); self.assertEqual(self.status().returncode,2)
-        shutil.rmtree(j); self.init(); j=self.pub/'manuscript'/'j'; self.make_junction(j,real); self.assertEqual(self.status().returncode,2)
-        shutil.rmtree(j); srcj=self.d/'srcj'; self.make_junction(srcj,self.src); self.write_cfg(source_repo_path=str(srcj)); self.assertEqual(self.status().returncode,2)
+        os.rmdir(j); self.init(); j=self.pub/'manuscript'/'j'; self.make_junction(j,real); self.assertEqual(self.status().returncode,2)
+        os.rmdir(j); srcj=self.d/'srcj'; self.make_junction(srcj,self.src); self.write_cfg(source_repo_path=str(srcj)); self.assertEqual(self.status().returncode,2)
         self.write_cfg(); pubj=self.d/'pubj'; self.make_junction(pubj,self.pub); self.write_cfg(publishing_repo_path=str(pubj)); self.assertEqual(self.status().returncode,2)
         self.write_cfg(); parent=self.d/'statej'; self.make_junction(parent,self.d); self.write_cfg(state_file=str(parent/'s.json')); self.assertEqual(self.status().returncode,2)
 
