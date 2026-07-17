@@ -1,0 +1,3 @@
+interface:
+  display_name: "Codex BDD Automation Planner"
+  short_description: "Plan, prompt, and review Codex BDD automation work."

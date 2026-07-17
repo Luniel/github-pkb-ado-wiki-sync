@@ -1,0 +1,12 @@
+interface:
+  display_name: PCEOOD Hidden Events Analysis
+  short_description: analysis-only pass to detect compressed multi-event scenarios and reveal safe event boundaries.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

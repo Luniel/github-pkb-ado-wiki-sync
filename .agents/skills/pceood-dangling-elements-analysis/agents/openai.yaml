@@ -1,0 +1,12 @@
+interface:
+  display_name: PCEOOD Dangling Elements Analysis
+  short_description: analysis-only pass to detect ungrounded, unused, or implied scenario elements across Given/When/Then.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

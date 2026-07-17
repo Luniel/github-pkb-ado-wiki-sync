@@ -1,0 +1,18 @@
+interface:
+  display_name: PCEOOD BDD Craftsmanship
+  short_description: write and revise behavioral specifications under the pceood using
+    producore bdd craftsmanship rules. use when working on gherkin scenarios, refining
+    draft or current behavioral spec pages, analyzing raw notes into pkb-ready behavioral
+    specifications, orchestrating dangling elements analysis, permutations analysis,
+    and hidden events analysis before drafting; plus stakeholder enumeration exercise,
+    identifying candidate additional aspects, or producing todo inventories of possible
+    additional scenarios for human scope decisions.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

@@ -1,0 +1,12 @@
+interface:
+  display_name: PCEOOD Permutations Analysis
+  short_description: analysis-only pass to detect and classify meaningful behavioral variants and candidate additional scenarios.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true
