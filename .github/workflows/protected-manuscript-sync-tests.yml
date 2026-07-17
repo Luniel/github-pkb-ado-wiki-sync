@@ -1,0 +1,31 @@
+name: Protected Manuscript Sync Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches-ignore: [ main ]
+
+jobs:
+  python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p "test_protected_manuscript_sync.py" -v
+
+  powershell-wrapper:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        shell_name: [powershell, pwsh]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run wrapper tests
+        shell: ${{ matrix.shell_name }}
+        run: tests/test_the_gap_manuscript_sync_wrapper.ps1

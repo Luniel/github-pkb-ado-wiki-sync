@@ -313,3 +313,43 @@ Possible later additions:
 - CI-friendly non-interactive reporting
 - structured log output
 - optional promotion of launchers from config metadata
+---
+
+# Protected manuscript-publishing sync
+
+This repository also contains a **separate** protected manuscript-publishing tool. It does not change the existing PKB/ADO Wiki synchronization behavior described above.
+
+The protected manuscript tool is one-way only:
+
+```text
+<confidential source repository>/manuscript/ -> <sanitized publishing repository>/manuscript/
+```
+
+## Components
+
+- `protected_manuscript_sync.py` — generic Python engine using only the standard library.
+- `launchers/the-gap-manuscript-sync.ps1` — thin The Gap wrapper that discovers Python and forwards `status` or `publish` to the engine.
+- `configs/manuscript-publishing-sync.config.example.json` — example config schema.
+- `docs/Protected-Manuscript-Publishing-Workflow.md` — operational workflow and safety checklist.
+
+## Local-only config, state, and marker
+
+Actual book configs and state files should live under ignored `local-only/`; for The Gap the wrapper defaults to `local-only\the-gap-manuscript-sync.json`. The publishing repository must contain a marker file named `.protected-manuscript-publishing-target` whose trimmed content matches the configured `expected_target_id`.
+
+## Commands
+
+```powershell
+python protected_manuscript_sync.py status --config <config-path>
+python protected_manuscript_sync.py publish --config <config-path>
+.\launchers\the-gap-manuscript-sync.ps1 status
+.\launchers\the-gap-manuscript-sync.ps1 publish
+.\launchers\the-gap-manuscript-sync.ps1 status -ConfigPath <path>
+```
+
+`status` never mutates state or manuscript content. `publish` mirrors source to target only when the three-way source/baseline/target comparison proves it is safe.
+
+## Safety model
+
+The publishing repository may temporarily contain valuable Leanpub-originated or manual work. Target-side divergence blocks publishing until a human reconciles it. There is no reverse synchronization, no pullback action, no force option, and no overwrite bypass.
+
+See `docs/Protected-Manuscript-Publishing-Workflow.md` for the full workflow.
