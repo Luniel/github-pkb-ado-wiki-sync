@@ -158,7 +158,7 @@ def validate_env(c):
     return sm,tm
 
 def normalized_path_key(path):
-    return os.path.normcase(path)
+    return os.path.normcase(path).replace('\\','/')
 def has_ancestor(path, possible_ancestor):
     return path.startswith(possible_ancestor.rstrip('/') + '/')
 def validate_no_structural_collisions(files, dirs):

@@ -167,6 +167,17 @@ class T(unittest.TestCase):
         self.init(); base=self.state(); bad=[({'a':{'sha256':'0'*64,'bytes':1},'a/b.md':{'sha256':'0'*64,'bytes':1}},[]), ({'a':{'sha256':'0'*64,'bytes':1}},['a/empty']), ({},['a','a/b'])]
         for files,dirs in bad:
             x=dict(base); x['accepted_snapshot']={'files':files,'empty_dirs':dirs}; self.statep.write_text(json.dumps(x),encoding='utf-8'); self.assertEqual(self.status().returncode,2)
+
+    def test_windows_style_normalized_keys_keep_slashes_and_reject_ancestors(self):
+        def win_normcase(value):
+            return value.lower().replace('/','\\')
+        with mock.patch('protected_manuscript_sync.os.path.normcase',side_effect=win_normcase):
+            self.assertEqual(pms.normalized_path_key('A/B.md'),'a/b.md')
+            cases=[({'a':{'sha256':'0'*64,'bytes':1},'a/b.md':{'sha256':'0'*64,'bytes':1}},[]), ({'A':{'sha256':'0'*64,'bytes':1},'a/b.md':{'sha256':'0'*64,'bytes':1}},[]), ({'a':{'sha256':'0'*64,'bytes':1}},['A/empty']), ({},['a','a/b']), ({},['A','a/b'])]
+            for files,dirs in cases:
+                with self.assertRaises(pms.SyncError):
+                    pms.validate_snapshot_schema({'files':files,'empty_dirs':dirs})
+
     def test_transaction_parent_external_ignores_default_temp_and_cleans_success(self):
         self.init(); (self.src/'manuscript'/'new.md').write_text('new')
         state_parent=self.statep.parent; work_parent=state_parent/'.protected-manuscript-sync-work'; seen=[]; orig=pms.tempfile.mkdtemp
