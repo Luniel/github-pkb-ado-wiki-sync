@@ -542,8 +542,8 @@ function Build-SourceManifest {
         [Parameter(Mandatory = $true)][ref]$ResourceCount
     )
 
-    $activeFiles = Get-ActiveSpineEntries -Config $Config
-    $resources = Get-ReferencedResources -ActiveFiles $activeFiles -Config $Config
+    $activeFiles = @(Get-ActiveSpineEntries -Config $Config)
+    $resources = @(Get-ReferencedResources -ActiveFiles $activeFiles -Config $Config)
 
     $ActiveFileCount.Value = $activeFiles.Count
     $ResourceCount.Value = $resources.Count
@@ -607,7 +607,7 @@ function Get-TargetFileEntriesSafe {
 function Build-TargetManifest {
     param([Parameter(Mandatory = $true)]$Config)
 
-    $targetFiles = Get-TargetFileEntriesSafe -Config $Config
+    $targetFiles = @(Get-TargetFileEntriesSafe -Config $Config)
     $root = (Get-FullPathValue -PathValue $Config.publishing_manuscript_path).TrimEnd('\', '/')
 
     $manifest = foreach ($file in $targetFiles) {
@@ -620,8 +620,13 @@ function Build-TargetManifest {
 
 function Compare-Manifests {
     param(
-        [Parameter(Mandatory = $true)][array]$SourceManifest,
-        [Parameter(Mandatory = $true)][array]$TargetManifest
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [array]$SourceManifest,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [array]$TargetManifest
     )
 
     $sourceByKey = @{}
@@ -654,8 +659,13 @@ function Compare-Manifests {
 function New-PublicationPlan {
     param(
         [Parameter(Mandatory = $true)]$Config,
-        [Parameter(Mandatory = $true)][array]$SourceManifest,
-        [Parameter(Mandatory = $true)][array]$TargetManifest
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [array]$SourceManifest,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [array]$TargetManifest
     )
 
     $diffs = @(Compare-Manifests -SourceManifest $SourceManifest -TargetManifest $TargetManifest)
@@ -678,7 +688,9 @@ function Write-Summary {
         [Parameter(Mandatory = $true)]$Config,
         [Parameter(Mandatory = $true)][int]$ActiveFileCount,
         [Parameter(Mandatory = $true)][int]$ResourceCount,
-        [Parameter(Mandatory = $true)][array]$Diffs
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [array]$Diffs
     )
 
     Write-Host "Source manuscript path: $($Config.source_manuscript_path)"
@@ -722,8 +734,8 @@ function Get-ValidatedPlan {
 
     $activeFileCount = 0
     $resourceCount = 0
-    $sourceManifest = Build-SourceManifest -Config $Config -ActiveFileCount ([ref]$activeFileCount) -ResourceCount ([ref]$resourceCount)
-    $targetManifest = Build-TargetManifest -Config $Config
+    $sourceManifest = @(Build-SourceManifest -Config $Config -ActiveFileCount ([ref]$activeFileCount) -ResourceCount ([ref]$resourceCount))
+    $targetManifest = @(Build-TargetManifest -Config $Config)
     $diffs = @(New-PublicationPlan -Config $Config -SourceManifest $sourceManifest -TargetManifest $targetManifest)
 
     return [PSCustomObject]@{
@@ -808,8 +820,13 @@ function Remove-EmptyTargetDirectories {
 
 function Assert-ManifestsMatch {
     param(
-        [Parameter(Mandatory = $true)][array]$ExpectedManifest,
-        [Parameter(Mandatory = $true)][array]$ActualManifest
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [array]$ExpectedManifest,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [array]$ActualManifest
     )
 
     $verificationDiffs = @(Compare-Manifests -SourceManifest $ExpectedManifest -TargetManifest $ActualManifest | Where-Object { $_.operation -ne 'UNCHANGED' })
@@ -822,7 +839,9 @@ function Assert-ManifestsMatch {
 function Save-LeanpubState {
     param(
         [Parameter(Mandatory = $true)]$Config,
-        [Parameter(Mandatory = $true)][array]$FinalManifest
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [array]$FinalManifest
     )
 
     $stateDirectory = Split-Path -Parent $Config.state_file
@@ -869,7 +888,7 @@ function Invoke-LeanpubPublish {
 
     Remove-EmptyTargetDirectories -Config $Config
 
-    $finalTargetManifest = Build-TargetManifest -Config $Config
+    $finalTargetManifest = @(Build-TargetManifest -Config $Config)
     Assert-ManifestsMatch -ExpectedManifest $plan.source_manifest -ActualManifest $finalTargetManifest
     Save-LeanpubState -Config $Config -FinalManifest $finalTargetManifest
 }

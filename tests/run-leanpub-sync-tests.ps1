@@ -309,6 +309,51 @@ Test-Case 'fails on resource traversal outside source root' {
     Invoke-ToolExpectFailure $fx status 'Unsafe resource reference'
 }
 
+
+Test-Case 'handles zero referenced resources without scalar/null unrolling' {
+    $fx = New-Fixture
+    New-TextFile (Join-Path $fx.Source 'chapter1.md') '# no resources'
+    New-TextFile (Join-Path $fx.Source 'chapter2.md') '# no resources either'
+    $output = Invoke-Tool $fx status
+    Assert-True ($output -match 'Referenced resources:\s+0') $output
+}
+
+Test-Case 'handles one referenced resource without scalar/null unrolling' {
+    $fx = New-Fixture
+    $output = Invoke-Tool $fx status
+    Assert-True ($output -match 'Referenced resources:\s+1') $output
+}
+
+Test-Case 'handles multiple referenced resources without scalar/null unrolling' {
+    $fx = New-Fixture
+    New-TextFile (Join-Path $fx.Source 'resources/b.png') 'B'
+    New-TextFile (Join-Path $fx.Source 'chapter1.md') "![a](resources/a.png)`n![b](resources/b.png)"
+    $output = Invoke-Tool $fx status
+    Assert-True ($output -match 'Referenced resources:\s+2') $output
+}
+
+Test-Case 'handles zero target manifest entries without scalar/null unrolling' {
+    $fx = New-Fixture
+    $output = Invoke-Tool $fx status
+    Assert-True ($output -match 'ADD count:\s+4') $output
+    Assert-True ($output -match 'DELETE count:\s+0') $output
+}
+
+Test-Case 'handles one target manifest entry without scalar/null unrolling' {
+    $fx = New-Fixture
+    New-TextFile (Join-Path $fx.Pub 'stale.md') 'stale'
+    $output = Invoke-Tool $fx status
+    Assert-True ($output -match 'DELETE count:\s+1') $output
+}
+
+Test-Case 'handles multiple target manifest entries without scalar/null unrolling' {
+    $fx = New-Fixture
+    New-TextFile (Join-Path $fx.Pub 'stale-a.md') 'stale a'
+    New-TextFile (Join-Path $fx.Pub 'stale-b.md') 'stale b'
+    $output = Invoke-Tool $fx status
+    Assert-True ($output -match 'DELETE count:\s+2') $output
+}
+
 Test-Case 'unreferenced resources are not copied' {
     $fx = New-Fixture
     Invoke-Tool $fx publish | Out-Null
