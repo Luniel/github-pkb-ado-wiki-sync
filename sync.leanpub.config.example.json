@@ -1,0 +1,7 @@
+{
+  "source_manuscript_path": "D:\\GitHub\\book-the-gap\\manuscript",
+  "publishing_repo_path": "D:\\GitHub\\book-the-gap-publishing",
+  "publishing_manuscript_path": "manuscript",
+  "spine_file": "book.txt",
+  "state_file": ".\\the-gap-leanpub.sync.state.json"
+}

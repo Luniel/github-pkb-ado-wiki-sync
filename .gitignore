@@ -10,3 +10,7 @@ Thumbs.db
 # Local-only folders
 history/
 local-only/
+
+# Local runtime sync configuration/state (examples remain tracked at repo root)
+configs/*.sync.json
+configs/*.sync.state.json
