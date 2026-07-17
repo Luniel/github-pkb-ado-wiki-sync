@@ -40,7 +40,7 @@ The config values are:
 - `publishing_repo_path`: Leanpub publishing Git repository root, for example `D:\GitHub\book-the-gap-publishing`
 - `publishing_manuscript_path`: target manuscript folder relative to the publishing repository, normally `manuscript`
 - `spine_file`: active Leanpub spine relative to the source manuscript root, normally lowercase `book.txt`
-- `state_file`: optional audit state path; relative paths resolve beside the config file
+- `state_file`: optional audit state path; relative paths resolve beside the config file. The resolved state file must stay inside this sync-tool repository and outside the source manuscript, source Git repository when detectable, publishing repository, and publishing manuscript directory. The recommended location is `configs/`.
 
 Local `configs/*.sync.json` and `configs/*.sync.state.json` files are ignored so machine-specific paths and generated state are not accidentally committed. The committed example config remains tracked.
 
@@ -57,7 +57,7 @@ The summary shows resolved paths, active manuscript count, referenced resource c
 
 ## Initial publish
 
-Publish performs the same validation before mutation, copies only the generated manifest, deletes stale files only under the configured publishing manuscript directory, removes empty directories there, and writes the audit state after success.
+Publish performs all validation, source manifest construction, target manifest inspection, and plan validation before any target mutation. It then copies only the generated manifest, deletes stale files only under the configured publishing manuscript directory, removes empty directories there, rebuilds and verifies the resulting target manifest, and writes the audit state only after verification succeeds.
 
 ```powershell
 .\sync_github_book_leanpub.ps1 publish `
@@ -112,12 +112,29 @@ The Leanpub sync:
 - rejects absolute paths, drive-qualified paths, UNC paths, `..` traversal, missing files, directories where files are required, and source/target overlap
 - rejects resources outside `resources/` or outside the source manuscript root
 - avoids symlink/reparse-point paths that could escape the source root
+- rejects publishing-target reparse points, junctions, and symbolic links before target reads, writes, deletes, or cleanup
+- supports ordinary Git repositories and Git worktrees where `.git` is either a directory or a file
 - never copies `.git`, `manuscript/old`, unreferenced resources, or the whole manuscript directory
 - never mutates source manuscript files
 - never mutates files outside the publishing manuscript directory
 - never commits, pushes, branches, pulls, or merges either repository
 
-Resource parsing intentionally supports ordinary Markdown/Markua image references such as `![Alt](resources/file.png)`, optional quoted titles, and angle-bracket paths with spaces. It is not a complete Markdown parser.
+Resource parsing intentionally supports ordinary Markdown/Markua image references such as `![Alt](resources/file.png)`, optional quoted titles, angle-bracket paths with spaces or parentheses, query strings/fragments, percent-encoded spaces, and simple escaped spaces/parentheses. It ignores external protocols and fragment-only references. Local non-image Markdown links are explicitly unsupported and ignored. It is not a complete Markdown parser.
+
+
+## Test commands
+
+Run the fixture test suite with both supported runtimes when available:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\tests\run-leanpub-sync-tests.ps1
+
+pwsh -NoProfile `
+  -File .\tests\run-leanpub-sync-tests.ps1
+```
+
+The repository also includes `.github/workflows/leanpub-sync-tests.yml`, which runs the same test harness on Windows with Windows PowerShell 5.1 and PowerShell 7 for PRs and pushes that affect the Leanpub sync files.
 
 ## Troubleshooting
 
@@ -144,6 +161,14 @@ On Windows, run from an appropriate shell or use:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\sync_github_book_leanpub.ps1 status -ConfigPath .\configs\the-gap-leanpub.sync.json
 ```
+
+### Unsafe state-file path
+
+Keep machine-specific config and generated state under this sync-tool repository, preferably `configs/`. A state path inside `book-the-gap`, `book-the-gap-publishing`, the publishing manuscript directory, or outside this sync-tool repository is rejected so the sync tool cannot mutate either book repository through its audit state.
+
+### Reparse-point or symbolic-link rejection
+
+If the script reports a reparse point, junction, or symbolic link, replace that path with a normal directory/file inside the approved repository. The script rejects target-side indirection to avoid reading, writing, deleting, or pruning outside the configured publishing manuscript directory.
 
 ### Empty or unexpected publishing diff
 

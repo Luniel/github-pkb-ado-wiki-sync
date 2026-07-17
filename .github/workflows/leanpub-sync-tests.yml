@@ -1,0 +1,43 @@
+name: Leanpub Sync Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'sync_github_book_leanpub.ps1'
+      - 'sync.leanpub.config.example.json'
+      - 'tests/**'
+      - 'docs/Leanpub-Publishing-Sync-Workflow.md'
+      - '.github/workflows/leanpub-sync-tests.yml'
+  push:
+    branches:
+      - codex/add-one-way-leanpub-publication-sync
+    paths:
+      - 'sync_github_book_leanpub.ps1'
+      - 'sync.leanpub.config.example.json'
+      - 'tests/**'
+      - 'docs/Leanpub-Publishing-Sync-Workflow.md'
+      - '.github/workflows/leanpub-sync-tests.yml'
+
+jobs:
+  leanpub-sync-tests:
+    name: ${{ matrix.shell-name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shell-name: Windows PowerShell 5.1
+            shell: powershell
+            command: powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\run-leanpub-sync-tests.ps1
+          - shell-name: PowerShell 7
+            shell: pwsh
+            command: pwsh -NoProfile -File .\tests\run-leanpub-sync-tests.ps1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run Leanpub sync fixture tests
+        shell: ${{ matrix.shell }}
+        run: ${{ matrix.command }}

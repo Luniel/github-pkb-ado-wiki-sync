@@ -91,7 +91,7 @@ GitHub-PKB-ADO-Wiki-Sync/
 This repository now contains two separate synchronization tools:
 
 - **PKB ↔ ADO Wiki bidirectional synchronization**: `sync_github_pkb_ado_wiki.ps1` mirrors an authoritative in-repository PKB folder with an Azure DevOps Wiki Git repository. It supports `status`, `publish`, and `pullback`, uses a state file for conflict detection, and is documented in `docs/ADO-Wiki-Setup-and-Sync-Workflow.md`.
-- **Book manuscript → Leanpub publishing repository one-way projection**: `sync_github_book_leanpub.ps1` projects only the Leanpub allowlist derived from `book.txt` and referenced `resources/` files into a separate publishing repository. It supports only `status` and `publish`, never pulls back, never commits or pushes, and is documented in `docs/Leanpub-Publishing-Sync-Workflow.md`.
+- **Book manuscript → Leanpub publishing repository one-way projection**: `sync_github_book_leanpub.ps1` projects only the Leanpub allowlist derived from `book.txt` and referenced `resources/` files into a separate publishing repository. It supports only `status` and `publish`, validates and plans before mutation, rejects unsafe state-file and reparse-point locations, never pulls back, never commits or pushes, and is documented in `docs/Leanpub-Publishing-Sync-Workflow.md`.
 
 Use the PKB ↔ ADO tool for Azure DevOps Wiki stewardship. Use the Leanpub tool only for the conservative `book-the-gap` manuscript-to-publishing-repository workflow.
 
